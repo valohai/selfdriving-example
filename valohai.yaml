@@ -1,0 +1,26 @@
+- step:
+    name: train-model
+    image: juhavalohai/driver
+    command:
+      - mkdir -p /valohai/inputs/images
+      - tar -C /valohai/inputs/images -x -f /valohai/inputs/images/driver.tar.gz
+      - ls -la /valohai/inputs/images
+      - python train.py {parameters}
+    parameters:
+      - name: max_steps
+        type: integer
+        pass-as: --max_steps={v}
+        description: Number of steps to run the trainer
+        default: 300
+      - name: learning_rate
+        type: float
+        pass-as: --learning_rate={v}
+        description: Initial learning rate
+        default: 0.001
+      - name: dropout
+        type: float
+        pass-as: --dropout={v}
+        description: Keep probability for training dropout
+        default: 0.9
+    inputs:
+      - name: images
