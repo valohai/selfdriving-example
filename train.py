@@ -4,12 +4,39 @@ import torch.optim as optim
 from torch.utils import data
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
-
+import argparse
 import cv2
-
 import numpy as np
-
 import csv
+from model import *
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--max_epochs',
+    type=int,
+    default=20,
+    help='Number of epochs to run trainer',
+)
+parser.add_argument(
+    '--batch_size',
+    type=int,
+    default=32,
+    help='Number of steps to run trainer',
+)
+parser.add_argument(
+    '--learning_rate',
+    type=float,
+    default=0.001,
+    help='Initial learning rate',
+)
+parser.add_argument(
+    '--validation_set_size',
+    type=float,
+    default=0.2,
+    help='Percentage of steps to use for validation vs. training',
+)
+flags = parser.parse_args()
+
 
 # Step1: Read from the log file
 samples = []
@@ -20,7 +47,7 @@ with open('/valohai/inputs/driving_dataset/data/driving_log.csv') as csvfile:
         samples.append(line)
 
 # Step2: Divide the data into training set and validation set
-train_len = int(0.8*len(samples))
+train_len = int((1.0 - flags.validation_set_size)*len(samples))
 valid_len = len(samples) - train_len
 train_samples, validation_samples = data.random_split(samples, lengths=[train_len, valid_len])
 
@@ -58,7 +85,7 @@ class Dataset(data.Dataset):
 # Step3b: Creating generator using the dataloader to parallasize the process
 transformations = transforms.Compose([transforms.Lambda(lambda x: (x / 255.0) - 0.5)])
 
-params = {'batch_size': 32,
+params = {'batch_size': flags.batch_size,
           'shuffle': True,
           'num_workers': 4}
 
@@ -69,69 +96,9 @@ validation_set = Dataset(validation_samples, transformations)
 validation_generator = DataLoader(validation_set, **params)
 
 
-# Step4: Define the network
-class NetworkDense(nn.Module):
-
-    def __init__(self):
-        super(NetworkDense, self).__init__()
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(3, 24, 5, stride=2),
-            nn.ELU(),
-            nn.Conv2d(24, 36, 5, stride=2),
-            nn.ELU(),
-            nn.Conv2d(36, 48, 5, stride=2),
-            nn.ELU(),
-            nn.Conv2d(48, 64, 3),
-            nn.ELU(),
-            nn.Conv2d(64, 64, 3),
-            nn.Dropout(0.25)
-        )
-        self.linear_layers = nn.Sequential(
-            nn.Linear(in_features=64 * 2 * 33, out_features=100),
-            nn.ELU(),
-            nn.Linear(in_features=100, out_features=50),
-            nn.ELU(),
-            nn.Linear(in_features=50, out_features=10),
-            nn.Linear(in_features=10, out_features=1)
-        )
-
-    def forward(self, input):
-        input = input.view(input.size(0), 3, 70, 320)
-        output = self.conv_layers(input)
-        output = output.view(output.size(0), -1)
-        output = self.linear_layers(output)
-        return output
-
-
-class NetworkLight(nn.Module):
-
-    def __init__(self):
-        super(NetworkLight, self).__init__()
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(3, 24, 3, stride=2),
-            nn.ELU(),
-            nn.Conv2d(24, 48, 3, stride=2),
-            nn.MaxPool2d(4, stride=4),
-            nn.Dropout(p=0.25)
-        )
-        self.linear_layers = nn.Sequential(
-            nn.Linear(in_features=48 * 4 * 19, out_features=50),
-            nn.ELU(),
-            nn.Linear(in_features=50, out_features=10),
-            nn.Linear(in_features=10, out_features=1)
-        )
-
-    def forward(self, input):
-        input = input.view(input.size(0), 3, 70, 320)
-        output = self.conv_layers(input)
-        output = output.view(output.size(0), -1)
-        output = self.linear_layers(output)
-        return output
-
-
 # Step5: Define optimizer
 model = NetworkLight()
-optimizer = optim.Adam(model.parameters(), lr=0.0001)
+optimizer = optim.Adam(model.parameters(), lr=flags.learning_rate)
 criterion = nn.MSELoss()
 
 # Step6: Check the device and define function to move tensors to that device
@@ -144,12 +111,16 @@ def toDevice(datas, device):
     return imgs.float().to(device), angles.float().to(device)
 
 
-max_epochs = 22
+max_epochs = flags.max_epochs
 for epoch in range(max_epochs):
     model.to(device)
 
     # Training
     train_loss = 0
+    valid_loss = 0
+    real_train_loss = 0
+    real_valid_loss = 0
+
     model.train()
     for local_batch, (centers, lefts, rights) in enumerate(training_generator):
         # Transfer to GPU
@@ -166,13 +137,10 @@ for epoch in range(max_epochs):
             optimizer.step()
             train_loss += loss.data
 
-        if local_batch % 100 == 0:
-            print('{"loss": %.3f, "epoch": %s}'
-                  % (train_loss / (local_batch + 1), epoch))
-
+        real_train_loss = train_loss / (local_batch + 1)
+            
     # Validation
     model.eval()
-    valid_loss = 0
     with torch.set_grad_enabled(False):
         for local_batch, (centers, lefts, rights) in enumerate(validation_generator):
             # Transfer to GPU
@@ -187,10 +155,9 @@ for epoch in range(max_epochs):
                 loss = criterion(outputs, angles.unsqueeze(1))
                 valid_loss += loss.data
 
-            if local_batch % 100 == 0:
-                print('{"valid_loss": %.3f, "epoch": %s}'
-                      % (valid_loss / (local_batch + 1), epoch))
+            real_valid_loss = valid_loss / (local_batch + 1)
 
+    print('{"loss": %f, "valid_loss": %f, "epoch": %s}' % (real_train_loss, real_valid_loss, epoch))
 
 # Step8: Define state and save the model wrt to state
 state = {'model': model.module if device == 'cuda' else model}

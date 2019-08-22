@@ -2,26 +2,29 @@
     name: train-model
     image: juhavalohai/driver
     command:
-      - mkdir -p /valohai/inputs/driving_dataset
       - tar -C /valohai/inputs/driving_dataset -x -f /valohai/inputs/driving_dataset/selfdriving.tar.gz
-      - ls -la /valohai/inputs/driving_dataset
       - python train.py {parameters}
     parameters:
-      - name: max_steps
+      - name: max_epochs
         type: integer
-        pass-as: --max_steps={v}
-        description: Number of steps to run the trainer
-        default: 300
+        pass-as: --max_epochs={v}
+        description: Number of epochs to run the trainer
+        default: 20
+      - name: batch_size
+        type: integer
+        pass-as: --batch_size={v}
+        description: Size of the training batch
+        default: 20
+      - name: validation_set_size
+        type: float
+        pass-as: --validation_set_size={v}
+        description: How much of the data is used for validation (%)
+        default: 0.2
       - name: learning_rate
         type: float
         pass-as: --learning_rate={v}
         description: Initial learning rate
         default: 0.001
-      - name: dropout
-        type: float
-        pass-as: --dropout={v}
-        description: Keep probability for training dropout
-        default: 0.9
     inputs:
       - name: driving_dataset
         default: https://valohai-examples.s3-eu-west-1.amazonaws.com/self-driving/selfdriving.tar.gz
