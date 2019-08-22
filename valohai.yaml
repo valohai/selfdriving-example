@@ -2,9 +2,9 @@
     name: train-model
     image: juhavalohai/driver
     command:
-      - mkdir -p /valohai/inputs/images
-      - tar -C /valohai/inputs/images -x -f /valohai/inputs/images/driver.tar.gz
-      - ls -la /valohai/inputs/images
+      - mkdir -p /valohai/inputs/driving_dataset
+      - tar -C /valohai/inputs/driving_dataset -x -f /valohai/inputs/driving_dataset/selfdriving.tar.gz
+      - ls -la /valohai/inputs/driving_dataset
       - python train.py {parameters}
     parameters:
       - name: max_steps
@@ -23,4 +23,5 @@
         description: Keep probability for training dropout
         default: 0.9
     inputs:
-      - name: images
+      - name: driving_dataset
+        default: https://valohai-examples.s3-eu-west-1.amazonaws.com/self-driving/selfdriving.tar.gz

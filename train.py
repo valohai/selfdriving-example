@@ -13,7 +13,7 @@ import csv
 
 # Step1: Read from the log file
 samples = []
-with open('/valohai/inputs/images/driving_log.csv') as csvfile:
+with open('/valohai/inputs/driving_dataset/data/driving_log.csv') as csvfile:
     reader = csv.reader(csvfile)
     next(reader, None)
     for line in reader:
@@ -26,7 +26,7 @@ train_samples, validation_samples = data.random_split(samples, lengths=[train_le
 
 # Step3a: Define the augmentation, transformation processes, parameters and dataset for dataloader
 def augment(imgName, angle):
-  name = '/valohai/inputs/images/' + imgName.split('/')[-1]
+  name = '/valohai/inputs/driving_dataset/data/IMG/' + imgName.split('/')[-1]
   current_image = cv2.imread(name)
   current_image = current_image[65:-25, :, :]
   if np.random.rand() < 0.5:
