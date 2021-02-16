@@ -134,7 +134,7 @@ if __name__ == '__main__':
         print("NOT RECORDING THIS RUN ...")
 
     # wrap Flask application with engineio's middleware
-    app = socketio.Middleware(sio, app)
+    app = socketio.WSGIApp(sio, app, socketio_path='/juha/selfdriving/drive/vroom/drive/socket.io')
 
     # deploy as an eventlet WSGI server
     eventlet.wsgi.server(eventlet.listen(('', 4567)), app)

@@ -28,3 +28,12 @@
     inputs:
       - name: driving_dataset
         default: https://valohai-examples.s3-eu-west-1.amazonaws.com/self-driving/selfdriving.tar.gz
+- endpoint:
+    name: drive
+    image: juhavalohai/driver-inference
+    port: 4567
+    server-command: python drive.py model.h5
+    files:
+      - name: model
+        description: Model output file from TensorFlow
+        path: model.h5
